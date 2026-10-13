@@ -1,6 +1,11 @@
+import { auth } from '@/auth'
+import { logoutAction } from '@/lib/actions'
 import Link from 'next/link'
 
-export function SiteHeader() {
+export async function SiteHeader() {
+  const session = await auth()
+  console.log(session)
+
   return (
     <header className="border-b border-black/[.08] dark:border-white/[.145]">
       <div className="mx-auto flex max-w-2xl items-center justify-between px-8 py-4">
@@ -29,6 +34,26 @@ export function SiteHeader() {
           >
             글쓰기
           </Link>
+          {session?.user ? (
+            <div className="flex items-center gap-3">
+              <span>{session.user.name}님</span>
+              <form action={logoutAction}>
+                <button
+                  type="submit"
+                  className="rounded-md border border-black/[.08] px-3 py-1.5 hover:bg-black/[.03] dark:border-white/[.145] dark:hover:bg-white/[.05]"
+                >
+                  로그아웃
+                </button>
+              </form>
+            </div>
+          ) : (
+            <Link
+              href="/login"
+              className="rounded-md border border-black/[.08] px-3 py-1.5 hover:bg-black/[.03] dark:border-white/[.145] dark:hover:bg-white/[.05]"
+            >
+              로그인
+            </Link>
+          )}
         </nav>
       </div>
     </header>
