@@ -36,7 +36,8 @@ export async function SiteHeader() {
           </Link>
           {session?.user ? (
             <div className="flex items-center gap-3">
-              <span>{session.user.name}님</span>
+              <span> {session.user.name}님 </span>
+              <span> {session.user.email} </span>
               <form action={logoutAction}>
                 <button
                   type="submit"
