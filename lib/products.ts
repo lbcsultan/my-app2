@@ -122,3 +122,13 @@ export async function getProductsByIds(ids: string[]): Promise<Product[]> {
     return []
   }
 }
+
+// 11주차: 주문이 만들어지면 그만큼 재고를 줄입니다. $inc는 "현재 값을
+// 서버가 원자적으로 증감"하는 연산이라, 여러 사용자가 동시에 같은
+// 상품을 주문해도 두 요청이 서로의 감소분을 덮어쓰지 않습니다(먼저
+// 읽은 값에 -qty를 계산해 다시 쓰는 방식이었다면 경쟁 상태가 생겼을
+// 것입니다).
+export async function decrementStock(productId: string, qty: number) {
+  await connectDB()
+  await ProductModel.updateOne({ _id: productId }, { $inc: { stock: -qty } })
+}

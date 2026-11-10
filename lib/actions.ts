@@ -6,8 +6,15 @@ import { redirect } from 'next/navigation'
 import { createUser } from './users'
 import { auth, signIn, signOut } from '@/auth'
 import { AuthError } from 'next-auth'
-import { getProduct } from './products'
-import { addToCart, removeFromCart, updateCartQty } from './cart'
+import { decrementStock, getProduct, getProductsByIds } from './products'
+import {
+  addToCart,
+  clearCart,
+  getCartLines,
+  removeFromCart,
+  updateCartQty,
+} from './cart'
+import { createOrder } from './orders'
 
 // 10주차부터 상품 목록/상세 페이지는 "좋아요" 대신 실제 장바구니 담기를
 // 지원합니다. 폼에서 넘어온 수량(qty)을 그대로 믿지 않고, 실제 재고를
@@ -58,6 +65,59 @@ export async function removeFromCartAction(formData: FormData) {
   }
   await removeFromCart(productId)
   revalidatePath('/', 'layout')
+}
+
+// 11주차: 장바구니를 실제 주문으로 바꿉니다. 결제 대행사 연동은 이
+// 과목 범위 밖이므로 "결제하기"는 곧바로 주문을 만드는 것으로
+// 단순화합니다. 핵심은 결제 자체가 아니라, 아래 세 가지입니다.
+//
+// 1) 로그인하지 않으면 애초에 주문을 만들 수 없다 (인증)
+// 2) 가격/이름은 쿠키(클라이언트가 들고 있는 값)가 아니라 DB에서
+//    다시 조회해 채운다 (가격 변조 방지 — 10주차 lib/cart.ts와 같은 원칙)
+// 3) 주문에는 반드시 로그인한 사용자의 id가 서버에서 채워진다
+//    (다른 사람 이름으로 주문을 만들 수 없게)
+export async function checkoutAction() {
+  const session = await auth()
+  if (!session?.user) {
+    redirect('/login')
+  }
+
+  const lines = await getCartLines()
+  if (lines.length === 0) {
+    throw new Error('장바구니가 비어 있습니다.')
+  }
+
+  const products = await getProductsByIds(lines.map((line) => line.productId))
+  const items = lines
+    .map((line) => {
+      const product = products.find((p) => p.id === line.productId)
+      if (!product) return null
+      // 재고를 다시 한 번 이 시점 기준으로 강제합니다 — 장바구니에
+      // 담아둔 사이 재고가 줄어들었을 수도 있습니다.
+      const qty = Math.min(line.qty, product.stock)
+      if (qty <= 0) return null
+      return {
+        productId: product.id,
+        name: product.name,
+        price: product.price,
+        qty,
+      }
+    })
+    .filter((item): item is NonNullable<typeof item> => item !== null)
+
+  if (items.length === 0) {
+    throw new Error('주문할 수 있는 상품이 없습니다(품절되었을 수 있습니다).')
+  }
+
+  const order = await createOrder(session.user.id, items)
+  await Promise.all(
+    items.map((item) => decrementStock(item.productId, item.qty)),
+  )
+  await clearCart()
+
+  revalidatePath('/', 'layout')
+  revalidatePath('/orders')
+  redirect(`/orders/${order.id}`)
 }
 
 export async function createNoticeAction(formData: FormData) {

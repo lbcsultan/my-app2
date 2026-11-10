@@ -78,3 +78,8 @@ export async function removeFromCart(productId: string) {
   const lines = await readCart()
   await writeCart(lines.filter((line) => line.productId !== productId))
 }
+
+// 11주차: 결제(주문 생성)가 끝나면 장바구니를 비웁니다.
+export async function clearCart() {
+  await writeCart([])
+}

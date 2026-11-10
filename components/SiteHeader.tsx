@@ -9,7 +9,7 @@ export async function SiteHeader() {
 
   return (
     <header className="border-b border-black/[.08] dark:border-white/[.145]">
-      <div className="mx-auto flex max-w-2xl items-center justify-between px-8 py-4">
+      <div className="mx-auto flex max-w-4xl items-center justify-between px-8 py-4">
         <Link
           href="/"
           className="text-sm font-semibold text-black dark:text-zinc-50"
@@ -48,8 +48,20 @@ export async function SiteHeader() {
           </Link>
           {session?.user ? (
             <div className="flex items-center gap-3">
-              <span> {session.user.name}님 </span>
-              <span> {session.user.email} </span>
+              <Link
+                href="/orders"
+                className="hover:text-black dark:hover:text-zinc-50"
+              >
+                주문내역
+              </Link>
+              <span className="text-zinc-500 dark:text-zinc-400">
+                {session.user.name}님
+                {session.user.role === 'admin' && (
+                  <span className="ml-1.5 rounded bg-black/[.06] px-1.5 py-0.5 text-xs font-medium text-zinc-600 dark:bg-white/[.08] dark:text-zinc-300">
+                    관리자
+                  </span>
+                )}
+              </span>
               <form action={logoutAction}>
                 <button
                   type="submit"
