@@ -12,13 +12,23 @@ import { authConfig } from './auth.config'
 // Server Component / Server Action / Route Handler처럼 Node.js 런타임에서
 // 실행되는 곳에서만 import합니다 — 미들웨어(Edge Runtime)에서는 이 파일이
 // 아니라 auth.config.ts를 직접 씁니다 (proxy.ts 참고).
-type UserDocLike = {
-  _id: unknown
-  name: string
-  email: string
-  passwordHash: string
-  role?: 'user' | 'admin'
+
+// ✅ [13주차 · 수정] "값이 없으면 하드코딩된 기본값을 쓴다"가 아니라
+// "값이 없으면 즉시, 명확하게 실패한다"로 바꿉니다. 이 함수가 던지는
+// 에러 메시지를 본 사람이 무엇을 해야 하는지 바로 알 수 있도록
+// `.env.local.example` 경로까지 안내합니다.
+function assertAuthSecret(): string {
+  const secret = process.env.AUTH_SECRET
+  if (!secret) {
+    throw new Error(
+      'AUTH_SECRET 환경변수가 없습니다. `.env.local.example`을 참고해 `.env.local`을 만들고, ' +
+        '`npx auth secret`으로 값을 채워주세요. (12주차처럼 코드에 기본값을 하드코딩하지 않습니다.)',
+    )
+  }
+  return secret
 }
+
+const authSecret = assertAuthSecret()
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   ...authConfig,
@@ -54,6 +64,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       },
     }),
   ],
+  secret: authSecret,
   session: {
     strategy: 'jwt',
   },

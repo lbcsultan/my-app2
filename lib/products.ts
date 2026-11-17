@@ -132,3 +132,46 @@ export async function decrementStock(productId: string, qty: number) {
   await connectDB()
   await ProductModel.updateOne({ _id: productId }, { $inc: { stock: -qty } })
 }
+
+// ✅ [13주차 · 신규 기능, 처음부터 안전하게 작성] 상품 검색.
+//
+// 이 함수를 만드는 "위험한" 방법은 사용자가 입력한 검색어를 그대로
+// Mongo 쿼리 연산자에 꽂는 것입니다. 예를 들어
+//
+//   ProductModel.find({ name: { $regex: rawQuery } })
+//
+// 이렇게 짜면, rawQuery에 정규식 특수문자(`.*`, `(`, `|` 등)가 그대로
+// 해석되어 의도치 않은 대량 조회나 서버 부하를 유발할 수 있고, 검색어를
+// 문자열이 아니라 객체로 조작해서 보낼 수 있는 경로(예: 폼이 아니라
+// API를 직접 호출)가 있다면 `{ "$ne": null }` 같은 값이 그대로 쿼리
+// 연산자로 해석되어 인증/조건을 우회하는 "NoSQL Injection"으로
+// 이어질 수 있습니다 — SQL Injection의 MongoDB 버전입니다.
+//
+// 안전하게 만드는 방법은 두 가지를 함께 지키는 것입니다.
+// 1) 입력값의 타입을 검증한다 — 반드시 string이어야 하고, 아니면 무시.
+// 2) 정규식으로 쓰기 전에 정규식 특수문자를 이스케이프한다 — 사용자
+//    입력이 "검색어 텍스트"로만 해석되게 만들고, "정규식 문법"이나
+//    "쿼리 연산자"로는 절대 해석되지 않게 만든다.
+function escapeRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+export async function searchProducts(rawQuery: unknown): Promise<Product[]> {
+  await connectDB()
+  await seedIfEmpty()
+
+  // 타입부터 검증합니다 — searchParams는 URL에서 오는 값이라 항상
+  // 문자열이지만, 이 함수를 다른 곳(예: API 라우트)에서도 재사용할 걸
+  // 대비해 한 번 더 확인합니다.
+  if (typeof rawQuery !== 'string' || rawQuery.trim() === '') {
+    return getProducts()
+  }
+
+  const safePattern = escapeRegExp(rawQuery.trim())
+  const docs = await ProductModel.find({
+    name: { $regex: safePattern, $options: 'i' },
+  })
+    .sort({ createdAt: 1 })
+    .lean<ProductDoc[]>()
+  return docs.map(toProduct)
+}
